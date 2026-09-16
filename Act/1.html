@@ -80,12 +80,13 @@
 
     .bank { min-height: 92px; display: flex; flex-wrap: wrap; align-items: center; justify-content: center; gap: 9px; max-width: 1000px; margin: 0 auto 20px; padding: 15px; border: 2px dashed #a7cbd6; border-radius: 12px; background: #f9fafb; }
     .bank::before { content: attr(data-label); flex: 0 0 100%; color: #61758a; text-align: center; font-size: .74rem; font-weight: 900; letter-spacing: .08em; text-transform: uppercase; }
-    .card { display: inline-flex; align-items: center; justify-content: center; min-height: 40px; padding: 8px 13px; border: 1px solid #d1d5db; border-radius: 8px; color: #374151; background: #fff; box-shadow: 0 1px 3px rgba(17,24,39,.08); cursor: grab; user-select: none; touch-action: manipulation; font-size: .86rem; font-style: italic; font-weight: 650; text-align: center; }
+    .card { display: inline-flex; align-items: center; justify-content: center; min-height: 40px; padding: 8px 13px; border: 1px solid #d1d5db; border-radius: 8px; color: #374151; background: #fff; box-shadow: 0 1px 3px rgba(17,24,39,.08); cursor: grab; user-select: none; touch-action: none; font-size: .86rem; font-style: italic; font-weight: 650; text-align: center; }
     .card:hover { color: #047857; border-color: #10b981; }
     .card.selected { border-color: #059669; box-shadow: 0 0 0 4px rgba(16,185,129,.16); }
     .card.correct { color: #064e3b; border-color: #059669; background: #d1fae5; font-weight: 800; }
     .card.wrong { color: #991b1b; border-color: #dc2626; background: #fee2e2; }
     .card.locked { cursor: default; }
+    .touch-clone { position: fixed !important; z-index: 9999; pointer-events: none; opacity: .94; transform: rotate(2deg) scale(1.03); box-shadow: 0 12px 28px rgba(17,24,39,.28) !important; }
 
     .zones { display: grid; grid-template-columns: repeat(3, 1fr); gap: 16px; max-width: 1000px; margin: auto; }
     .zone { min-height: 250px; padding: 13px; border: 2px dashed currentColor; border-radius: 12px; background: #fff; transition: background .15s ease, transform .15s ease; }
@@ -258,6 +259,10 @@
 
     let selected = null;
     let dragged = null;
+    let touchCard = null;
+    let touchClone = null;
+    let touchMoved = false;
+    let suppressClickUntil = 0;
     let scores = { q1: 0, q2: 0 };
 
     function shuffle(items) {
@@ -281,10 +286,14 @@
       card.dataset.id = item.id;
       card.dataset.answer = item.answer;
       card.dataset.group = group;
-      card.addEventListener('click', event => { event.stopPropagation(); chooseCard(card); });
+      card.addEventListener('click', event => { event.stopPropagation(); if (Date.now() >= suppressClickUntil) chooseCard(card); });
       card.addEventListener('keydown', event => { if (event.key === 'Enter' || event.key === ' ') { event.preventDefault(); chooseCard(card); } });
       card.addEventListener('dragstart', event => { if (card.classList.contains('locked')) return event.preventDefault(); dragged = card; event.dataTransfer.setData('text/plain', item.id); requestAnimationFrame(() => card.style.opacity = '.4'); });
       card.addEventListener('dragend', () => { card.style.opacity = ''; dragged = null; clearDrag(); });
+      card.addEventListener('touchstart', startTouchDrag, { passive: false });
+      card.addEventListener('touchmove', moveTouchDrag, { passive: false });
+      card.addEventListener('touchend', endTouchDrag, { passive: false });
+      card.addEventListener('touchcancel', cancelTouchDrag, { passive: false });
       return card;
     }
 
@@ -294,6 +303,74 @@
       document.querySelectorAll('.card.selected').forEach(element => element.classList.remove('selected'));
       selected = card;
       card.classList.add('selected');
+    }
+
+    function startTouchDrag(event) {
+      if (this.classList.contains('locked') || event.touches.length !== 1) return;
+      event.preventDefault();
+      touchCard = this;
+      dragged = this;
+      touchMoved = false;
+      const touch = event.touches[0];
+      const rect = this.getBoundingClientRect();
+      touchClone = this.cloneNode(true);
+      touchClone.classList.add('touch-clone');
+      touchClone.style.width = rect.width + 'px';
+      document.body.appendChild(touchClone);
+      this.style.opacity = '.38';
+      positionTouchClone(touch);
+    }
+
+    function moveTouchDrag(event) {
+      if (!touchCard || !touchClone || event.touches.length !== 1) return;
+      event.preventDefault();
+      touchMoved = true;
+      const touch = event.touches[0];
+      positionTouchClone(touch);
+      clearDrag();
+      const target = document.elementFromPoint(touch.clientX, touch.clientY);
+      const zone = target && target.closest('[data-zone]');
+      if (compatible(zone, touchCard)) zone.classList.add('drag-over');
+
+      const edge = 75;
+      if (touch.clientY > window.innerHeight - edge) window.scrollBy(0, 14);
+      else if (touch.clientY < edge) window.scrollBy(0, -14);
+    }
+
+    function endTouchDrag(event) {
+      if (!touchCard) return;
+      event.preventDefault();
+      const card = touchCard;
+      const touch = event.changedTouches[0];
+      const target = touch && document.elementFromPoint(touch.clientX, touch.clientY);
+      const zone = target && target.closest('[data-zone]');
+      const wasMoved = touchMoved;
+      cleanupTouchDrag();
+      suppressClickUntil = Date.now() + 450;
+      if (wasMoved && compatible(zone, card)) moveCard(card, zone);
+      else if (!wasMoved) chooseCard(card);
+    }
+
+    function cancelTouchDrag(event) {
+      if (event) event.preventDefault();
+      cleanupTouchDrag();
+      suppressClickUntil = Date.now() + 450;
+    }
+
+    function positionTouchClone(touch) {
+      if (!touchClone) return;
+      touchClone.style.left = (touch.clientX - touchClone.offsetWidth / 2) + 'px';
+      touchClone.style.top = (touch.clientY - touchClone.offsetHeight - 18) + 'px';
+    }
+
+    function cleanupTouchDrag() {
+      clearDrag();
+      if (touchCard) touchCard.style.opacity = '';
+      if (touchClone) touchClone.remove();
+      touchCard = null;
+      touchClone = null;
+      touchMoved = false;
+      dragged = null;
     }
 
     function compatible(zone, card) {
