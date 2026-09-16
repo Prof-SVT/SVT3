@@ -153,13 +153,13 @@
       .zone .card { min-height: 30px; padding: 5px 6px; font-size: .66rem; line-height: 1.15; }
       .zone-count { display: inline-grid; place-items: center; min-width: 21px; height: 21px; margin: 3px auto 0; padding: 0 5px; color: #fff; background: #047857; border-radius: 50px; font-size: .68rem; }
 
-      .method-list { grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 7px; }
-      .method-row { display: flex; flex-direction: column; gap: 5px; }
-      .method-index { width: 32px; height: 32px; margin: auto; font-size: .86rem; }
-      .method-sentence { min-height: 78px; padding: 6px; justify-content: center; }
-      .method-sentence > span { display: none; }
-      .method-drop { min-width: 0; width: 100%; min-height: 58px; }
-      .method-drop .card { padding: 5px 3px; font-size: .68rem; }
+      .method-list { grid-template-columns: 1fr; gap: 10px; }
+      .method-row { display: grid; grid-template-columns: 38px minmax(0, 1fr); gap: 8px; }
+      .method-index { width: 34px; height: 34px; margin: 0; align-self: center; font-size: .86rem; }
+      .method-sentence { min-height: 76px; padding: 10px; justify-content: flex-start; font-size: .8rem; line-height: 1.45; }
+      .method-sentence > span { display: inline; flex: 1 1 150px; }
+      .method-drop { min-width: 130px; width: auto; min-height: 48px; }
+      .method-drop .card { padding: 6px 7px; font-size: .72rem; }
       .actions, .actions-right { width: 100%; }
       .btn { flex: 1; padding: 9px 11px; }
       .recap { grid-template-columns: 1fr; }
